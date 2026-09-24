@@ -21,7 +21,9 @@ GLOBAL_VARS = {name: new_id('v') for name in
                ['Score J1', 'Score J2', 'Échange', 'Record échange', 'état',
                 'Taille J1', 'Taille J2',      # largeur des raquettes en % (50 à 175)
                 'Missile J1', 'Missile J2',    # 1 = missile prêt sur la raquette
-                'x J1', 'x J2']}               # position des raquettes, pour les missiles
+                'x J1', 'x J2',                # position des raquettes, pour les missiles
+                'Bouclier J1', 'Bouclier J2',  # 1 = bouclier actif derrière la raquette
+                'Taille balle']}               # taille de la balle en % (grossit avec le cadeau violet)
 BROADCASTS = {name: new_id('m') for name in
               ['nouvelle partie', 'pause', 'reprise', 'fin', 'touché J1', 'touché J2']}
 
@@ -165,6 +167,7 @@ class Target:
 
     def goto(self, x, y): return self.blk('motion_gotoxy', {'X': x, 'Y': y})
     def setx(self, x): return self.blk('motion_setx', {'X': x})
+    def sety(self, y): return self.blk('motion_sety', {'Y': y})
     def changex(self, d): return self.blk('motion_changexby', {'DX': d})
     def changey(self, d): return self.blk('motion_changeyby', {'DY': d})
     def xpos(self): return R(self.blk('motion_xposition'))
@@ -172,6 +175,9 @@ class Target:
     def show(self): return self.blk('looks_show')
     def hide(self): return self.blk('looks_hide')
     def front(self): return self.blk('looks_gotofrontback', fields={'FRONT_BACK': ['front', None]})
+
+    def set_size(self, value):
+        return self.blk('looks_setsizeto', {'SIZE': value})
 
     def ghost(self, value):
         return self.blk('looks_seteffectto', {'VALUE': value}, {'EFFECT': ['GHOST', None]})
@@ -268,15 +274,22 @@ def panel_svg(color, lines, h=190):
 
 
 WHITE = '#e8e6ff'
-RED, GREEN = '#ff4b4b', '#2bff88'
+RED, GREEN, BLUE, VIOLET = '#ff4b4b', '#2bff88', '#3b8bff', '#b04bff'
+
+SHIELD = f'''<svg xmlns="http://www.w3.org/2000/svg" width="472" height="10" viewBox="0 0 472 10">
+<rect x="0" y="0" width="472" height="10" rx="5" fill="{BLUE}" fill-opacity=".3"/>
+<rect x="2" y="3" width="468" height="4" rx="2" fill="{BLUE}"/>
+</svg>'''
 MSG_COSTUMES = {
     'titre': panel_svg(CYAN, [('PONG', 40, '#ffffff'),
                               ('Joueur 1 (haut) : Q / D · tir S', 15, PINK),
                               ('Joueur 2 (bas) : 4 / 6 · tir 8', 15, CYAN),
                               ('Cadeau rouge : missile', 13, RED),
                               ('Cadeau vert : raquette plus longue', 13, GREEN),
+                              ('Cadeau bleu : bouclier derrière la raquette', 13, BLUE),
+                              ('Cadeau violet : grosse balle (jusqu\'au point)', 13, VIOLET),
                               ('Premier à 11 points', 13, WHITE),
-                              ('ESPACE pour jouer · ESPACE = pause', 13, WHITE)], h=230),
+                              ('ESPACE pour jouer · ESPACE = pause', 13, WHITE)], h=272),
     'pause': panel_svg(WHITE, [('', 10, WHITE), ('PAUSE', 40, '#ffffff'),
                                ('ESPACE pour reprendre', 16, WHITE)]),
     'j1': panel_svg(PINK, [('', 4, WHITE), ('Joueur 1', 34, PINK), ('gagne !', 28, PINK),
@@ -314,12 +327,15 @@ s.script(s.on_key('space'), [
 ])
 
 # --- Balle ---------------------------------------------------------------
-ball = Target('Balle', ['dx', 'dy', 'vitesse', 'angle', 'facteur', 'point', 'sens'])
+ball = Target('Balle', ['dx', 'dy', 'vitesse', 'angle', 'facteur', 'point', 'sens', 'bord'])
 b = ball
 b.script(b.on_flag(), [b.hide(), b.goto(0, 0), b.ghost(0)])
 
 serve = [
     b.goto(0, 0),
+    # Fin de point : la balle reprend sa taille normale
+    b.set('Taille balle', 100),
+    b.set_size(100),
     b.set('Échange', 0),
     b.set('vitesse', 6),
     # Clignotement pendant ~1 s avant l'engagement
@@ -333,11 +349,16 @@ serve = [
     b.set('point', 0),
     b.repeat_until(b.eq(b.v('point'), 1), [
         b.wait_until(b.eq(b.v('état'), 'jeu')),
+        b.set_size(b.v('Taille balle')),
         b.changex(b.v('dx')),
         b.changey(b.v('dy')),
         # Murs latéraux
-        b.if_(b.gt(b.xpos(), 234), [b.setx(234), b.set('dx', b.sub_(0, b.mathop('abs', b.v('dx'))))]),
-        b.if_(b.lt(b.xpos(), -234), [b.setx(-234), b.set('dx', b.mathop('abs', b.v('dx')))]),
+        # Murs latéraux (rayon de la balle = 6 px à 100 %)
+        b.set('bord', b.sub_(240, b.mul(b.v('Taille balle'), 0.06))),
+        b.if_(b.gt(b.xpos(), b.v('bord')),
+              [b.setx(b.v('bord')), b.set('dx', b.sub_(0, b.mathop('abs', b.v('dx'))))]),
+        b.if_(b.lt(b.xpos(), b.sub_(0, b.v('bord'))),
+              [b.setx(b.sub_(0, b.v('bord'))), b.set('dx', b.mathop('abs', b.v('dx')))]),
         # Raquettes (seulement si la balle se dirige vers elles)
         b.if_(b.or_(b.and_(b.gt(b.v('dy'), 0), b.touching('Raquette J1')),
                     b.and_(b.lt(b.v('dy'), 0), b.touching('Raquette J2'))), [
@@ -352,6 +373,11 @@ serve = [
             b.set('dx', b.mul(b.v('dx'), b.v('facteur'))),
             b.set('dy', b.mul(b.sub_(0, b.v('dy')), b.v('facteur'))),
         ]),
+        # Boucliers : renvoient la balle une fois puis disparaissent
+        b.if_(b.and_(b.gt(b.v('dy'), 0), b.touching('Bouclier J1')),
+              [b.set('dy', b.sub_(0, b.v('dy'))), b.sety(158), b.set('Bouclier J1', 0)]),
+        b.if_(b.and_(b.lt(b.v('dy'), 0), b.touching('Bouclier J2')),
+              [b.set('dy', b.sub_(0, b.v('dy'))), b.sety(-158), b.set('Bouclier J2', 0)]),
         # Buts : le perdant du point reçoit l'engagement
         b.if_(b.gt(b.ypos(), 172), [b.change('Score J2', 1), b.set('sens', 1), b.set('point', 1)]),
         b.if_(b.lt(b.ypos(), -172), [b.change('Score J1', 1), b.set('sens', -1), b.set('point', 1)]),
@@ -413,7 +439,7 @@ def running(t):
 # --- Missiles ------------------------------------------------------------
 def make_missile(player, opponent, key, y_rest, dy):
     t = Target(f'Missile {player}')
-    missile, target = f'Missile {player}', f'Raquette {opponent}'
+    missile, target, shield = f'Missile {player}', f'Raquette {opponent}', f'Bouclier {opponent}'
 
     def fin():
         return t.eq(t.v('état'), 'fin')
@@ -430,15 +456,18 @@ def make_missile(player, opponent, key, y_rest, dy):
                 t.show(),
                 t.if_(t.key_pressed(key), [
                     t.set(missile, 0),
-                    t.repeat_until(t.or_(t.or_(t.gt(t.mathop('abs', t.ypos()), 178),
-                                               t.touching(target)), fin()), [
+                    t.repeat_until(t.or_(t.or_(t.gt(t.mathop('abs', t.ypos()), 178), fin()),
+                                         t.or_(t.touching(target), t.touching(shield))), [
                         t.wait_until(running(t)),
                         t.changey(dy),
                     ]),
-                    t.if_(t.touching(target), [
+                    t.if_else(t.touching(target), [
                         # La raquette touchée rétrécit de 25 % (minimum 50 %)
                         t.if_(t.gt(t.v(f'Taille {opponent}'), 50), [t.change(f'Taille {opponent}', -25)]),
                         t.broadcast(f'touché {opponent}'),
+                    ], [
+                        # Le bouclier absorbe le missile et disparaît
+                        t.if_(t.touching(shield), [t.set(shield, 0)]),
                     ]),
                     t.hide(),
                 ]),
@@ -452,8 +481,29 @@ def make_missile(player, opponent, key, y_rest, dy):
 missile1 = make_missile('J1', 'J2', 's', 134, -10)
 missile2 = make_missile('J2', 'J1', '8', -134, 10)
 
+# --- Boucliers -----------------------------------------------------------
+def make_shield(player, y):
+    t = Target(f'Bouclier {player}')
+    var = f'Bouclier {player}'
+    fin = t.eq(t.v('état'), 'fin')
+    t.script(t.on_flag(), [t.hide(), t.goto(0, y)])
+    t.script(t.on_msg('nouvelle partie'), [
+        t.set(var, 0),
+        t.goto(0, y),
+        t.repeat_until(fin, [
+            t.wait_until(running(t)),
+            t.if_else(t.eq(t.v(var), 1), [t.show()], [t.hide()]),
+        ]),
+        t.hide(),
+    ])
+    return t
+
+
+shield1 = make_shield('J1', 166)
+shield2 = make_shield('J2', -166)
+
 # --- Cadeaux -------------------------------------------------------------
-gift = Target('Cadeau', ['attente', 'type', 'sens', 'fini'])
+gift = Target('Cadeau', ['attente', 'tirage', 'type', 'sens', 'fini'])
 c = gift
 
 
@@ -463,10 +513,15 @@ def gift_fin():
 
 def give(player):
     return [
-        c.if_else(c.eq(c.v('type'), 1),
-                  [c.set(f'Missile {player}', 1)],            # attaque : un seul missile à la fois
-                  [c.if_(c.lt(c.v(f'Taille {player}'), 175),  # défense : raquette +25 %
-                         [c.change(f'Taille {player}', 25)])]),
+        # 1 attaque : un missile (un seul à la fois)
+        c.if_(c.eq(c.v('type'), 1), [c.set(f'Missile {player}', 1)]),
+        # 2 défense : raquette +25 % (jusqu'à 175 %)
+        c.if_(c.and_(c.eq(c.v('type'), 2), c.lt(c.v(f'Taille {player}'), 175)),
+              [c.change(f'Taille {player}', 25)]),
+        # 3 bouclier : barre de protection derrière la raquette
+        c.if_(c.eq(c.v('type'), 3), [c.set(f'Bouclier {player}', 1)]),
+        # 4 grosse balle : taille doublée jusqu'à la fin du point
+        c.if_(c.eq(c.v('type'), 4), [c.set('Taille balle', 200)]),
         c.set('fini', 1),
     ]
 
@@ -475,13 +530,18 @@ c.script(c.on_flag(), [c.hide()])
 c.script(c.on_msg('nouvelle partie'), [
     c.hide(),
     c.repeat_until(gift_fin(), [
-        # Attente de 3 à 7 s de jeu (la pause ne compte pas)
-        c.set('attente', c.random(3, 7)),
+        # Attente de 2 à 5 s de jeu (la pause ne compte pas)
+        c.set('attente', c.random(2, 5)),
         c.repeat_until(c.or_(c.lt(c.v('attente'), 0), gift_fin()), [
             c.wait_until(running(c)), c.wait(0.1), c.change('attente', -0.1),
         ]),
         c.if_(c.not_(gift_fin()), [
-            c.set('type', c.random(1, 2)),                        # 1 = attaque (rouge), 2 = défense (vert)
+            # Tirage pondéré : attaque 50 %, défense 20 %, bouclier 20 %, grosse balle 10 %
+            c.set('tirage', c.random(1, 10)),
+            c.set('type', 4),
+            c.if_(c.lt(c.v('tirage'), 10), [c.set('type', 3)]),
+            c.if_(c.lt(c.v('tirage'), 8), [c.set('type', 2)]),
+            c.if_(c.lt(c.v('tirage'), 6), [c.set('type', 1)]),
             c.costume_num(c.v('type')),
             c.set('sens', c.sub_(c.mul(c.random(0, 1), 2), 1)),  # 1 = vers J1 (haut), -1 = vers J2
             c.goto(c.random(-200, 200), 0),
@@ -526,7 +586,8 @@ def sprite_json(t, costumes, layer, x=0, y=0, visible=True, costume_index=0):
 
 stage_json = {
     'isStage': True, 'name': 'Stage',
-    'variables': {id: [n, {'état': 'titre', 'Taille J1': 100, 'Taille J2': 100}.get(n, 0)]
+    'variables': {id: [n, {'état': 'titre', 'Taille J1': 100, 'Taille J2': 100,
+                           'Taille balle': 100}.get(n, 0)]
                   for n, id in GLOBAL_VARS.items()},
     'lists': {}, 'broadcasts': {id: n for n, id in BROADCASTS.items()},
     'blocks': stage.blocks, 'comments': {}, 'currentCostume': 0,
@@ -555,11 +616,15 @@ project = {
         sprite_json(paddle2, paddle_costumes(CYAN), 2, 0, -150, costume_index=2),
         sprite_json(missile1, [costume('missile', missile_svg(PINK, down=True), 5, 12)], 3, visible=False),
         sprite_json(missile2, [costume('missile', missile_svg(CYAN, down=False), 5, 12)], 4, visible=False),
+        sprite_json(shield1, [costume('bouclier', SHIELD, 236, 5)], 5, 0, 166, visible=False),
+        sprite_json(shield2, [costume('bouclier', SHIELD, 236, 5)], 6, 0, -166, visible=False),
         sprite_json(gift, [costume('attaque', gift_svg(RED), 13, 13),
-                           costume('défense', gift_svg(GREEN), 13, 13)], 5, visible=False),
-        sprite_json(ball, [costume('balle', BALL, 8, 8)], 6, visible=False),
-        sprite_json(msg, [costume(n, svg, 180, 115 if n == 'titre' else 95)
-                          for n, svg in MSG_COSTUMES.items()], 7),
+                           costume('défense', gift_svg(GREEN), 13, 13),
+                           costume('bouclier', gift_svg(BLUE), 13, 13),
+                           costume('grosse balle', gift_svg(VIOLET), 13, 13)], 7, visible=False),
+        sprite_json(ball, [costume('balle', BALL, 8, 8)], 8, visible=False),
+        sprite_json(msg, [costume(n, svg, 180, 136 if n == 'titre' else 95)
+                          for n, svg in MSG_COSTUMES.items()], 9),
     ],
     'monitors': [
         monitor('Score J1', 8, 140, 'large'),
