@@ -8,6 +8,8 @@ import json
 import os
 import zipfile
 
+import sons
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 _ids = itertools.count(1)
 
@@ -23,7 +25,8 @@ GLOBAL_VARS = {name: new_id('v') for name in
                 'Missile J1', 'Missile J2',    # 1 = missile prêt sur la raquette
                 'x J1', 'x J2',                # position des raquettes, pour les missiles
                 'Bouclier J1', 'Bouclier J2',  # 1 = bouclier actif derrière la raquette
-                'Taille balle']}               # taille de la balle en % (grossit avec le cadeau violet)
+                'Taille balle',                # taille de la balle en % (grossit avec le cadeau violet)
+                'Son']}                        # 1 = son activé, 0 = coupé (touche M)
 BROADCASTS = {name: new_id('m') for name in
               ['nouvelle partie', 'pause', 'reprise', 'fin', 'touché J1', 'touché J2']}
 
@@ -199,7 +202,21 @@ class Target:
         self.blocks[id]['inputs']['BROADCAST_INPUT'] = [1, [11, name, BROADCASTS[name]]]
         return id
 
+    # -- sons --
+    def play(self, name):
+        menu = self.blk('sound_sounds_menu', fields={'SOUND_MENU': [name, None]}, shadow=True)
+        return self.blk('sound_play', {'SOUND_MENU': M(menu)})
+
+    def sfx(self, name):
+        """Joue un bruitage sauf si le son est coupé."""
+        return self.if_(self.eq(self.v('Son'), 1), [self.play(name)])
+
+    def stop_sounds(self):
+        return self.blk('sound_stopallsounds')
+
     # -- chapeaux --
+    def on_click(self): return self.blk('event_whenthisspriteclicked')
+
     def on_flag(self): return self.blk('event_whenflagclicked')
 
     def on_key(self, key):
@@ -239,6 +256,17 @@ def gift_svg(color):
 <rect x="3" y="3" width="20" height="20" rx="4" fill="{color}"/>
 <rect x="11" y="3" width="4" height="20" fill="#ffffff" fill-opacity=".85"/>
 <rect x="3" y="11" width="20" height="4" fill="#ffffff" fill-opacity=".85"/>
+</svg>'''
+
+
+def speaker_svg(on):
+    """Icône haut-parleur 26x22 : ondes si le son est actif, croix sinon."""
+    extra = ('<path d="M16 7 Q19 11 16 15 M19 4 Q24 11 19 18" fill="none" stroke="#e8e6ff" '
+             'stroke-width="2" stroke-linecap="round"/>' if on else
+             '<path d="M17 7 L24 15 M24 7 L17 15" stroke="#ff4b4b" stroke-width="2.5" stroke-linecap="round"/>')
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="26" height="22" viewBox="0 0 26 22">
+<path d="M2 8 H6 L12 3 V19 L6 14 H2 Z" fill="#e8e6ff" fill-opacity="{1 if on else .5}"/>
+{extra}
 </svg>'''
 
 
@@ -289,7 +317,8 @@ MSG_COSTUMES = {
                               ('Cadeau bleu : bouclier derrière la raquette', 13, BLUE),
                               ('Cadeau violet : grosse balle (jusqu\'au point)', 13, VIOLET),
                               ('Premier à 11 points', 13, WHITE),
-                              ('ESPACE pour jouer · ESPACE = pause', 13, WHITE)], h=272),
+                              ('ESPACE pour jouer · ESPACE = pause', 13, WHITE),
+                              ('M : couper / remettre le son', 13, WHITE)], h=292),
     'pause': panel_svg(WHITE, [('', 10, WHITE), ('PAUSE', 40, '#ffffff'),
                                ('ESPACE pour reprendre', 16, WHITE)]),
     'j1': panel_svg(PINK, [('', 4, WHITE), ('Joueur 1', 34, PINK), ('gagne !', 28, PINK),
@@ -356,12 +385,13 @@ serve = [
         # Murs latéraux (rayon de la balle = 6 px à 100 %)
         b.set('bord', b.sub_(240, b.mul(b.v('Taille balle'), 0.06))),
         b.if_(b.gt(b.xpos(), b.v('bord')),
-              [b.setx(b.v('bord')), b.set('dx', b.sub_(0, b.mathop('abs', b.v('dx'))))]),
+              [b.setx(b.v('bord')), b.set('dx', b.sub_(0, b.mathop('abs', b.v('dx')))), b.sfx('pong')]),
         b.if_(b.lt(b.xpos(), b.sub_(0, b.v('bord'))),
-              [b.setx(b.sub_(0, b.v('bord'))), b.set('dx', b.mathop('abs', b.v('dx')))]),
+              [b.setx(b.sub_(0, b.v('bord'))), b.set('dx', b.mathop('abs', b.v('dx'))), b.sfx('pong')]),
         # Raquettes (seulement si la balle se dirige vers elles)
         b.if_(b.or_(b.and_(b.gt(b.v('dy'), 0), b.touching('Raquette J1')),
                     b.and_(b.lt(b.v('dy'), 0), b.touching('Raquette J2'))), [
+            b.sfx('pong'),
             b.change('Échange', 1),
             b.if_(b.gt(b.v('Échange'), b.v('Record échange')),
                   [b.set('Record échange', b.v('Échange'))]),
@@ -375,9 +405,9 @@ serve = [
         ]),
         # Boucliers : renvoient la balle une fois puis disparaissent
         b.if_(b.and_(b.gt(b.v('dy'), 0), b.touching('Bouclier J1')),
-              [b.set('dy', b.sub_(0, b.v('dy'))), b.sety(158), b.set('Bouclier J1', 0)]),
+              [b.set('dy', b.sub_(0, b.v('dy'))), b.sety(158), b.set('Bouclier J1', 0), b.sfx('pong')]),
         b.if_(b.and_(b.lt(b.v('dy'), 0), b.touching('Bouclier J2')),
-              [b.set('dy', b.sub_(0, b.v('dy'))), b.sety(-158), b.set('Bouclier J2', 0)]),
+              [b.set('dy', b.sub_(0, b.v('dy'))), b.sety(-158), b.set('Bouclier J2', 0), b.sfx('pong')]),
         # Buts : le perdant du point reçoit l'engagement
         b.if_(b.gt(b.ypos(), 172), [b.change('Score J2', 1), b.set('sens', 1), b.set('point', 1)]),
         b.if_(b.lt(b.ypos(), -172), [b.change('Score J1', 1), b.set('sens', -1), b.set('point', 1)]),
@@ -456,6 +486,7 @@ def make_missile(player, opponent, key, y_rest, dy):
                 t.show(),
                 t.if_(t.key_pressed(key), [
                     t.set(missile, 0),
+                    t.sfx('missile'),
                     t.repeat_until(t.or_(t.or_(t.gt(t.mathop('abs', t.ypos()), 178), fin()),
                                          t.or_(t.touching(target), t.touching(shield))), [
                         t.wait_until(running(t)),
@@ -465,9 +496,16 @@ def make_missile(player, opponent, key, y_rest, dy):
                         # La raquette touchée rétrécit de 25 % (minimum 50 %)
                         t.if_(t.gt(t.v(f'Taille {opponent}'), 50), [t.change(f'Taille {opponent}', -25)]),
                         t.broadcast(f'touché {opponent}'),
+                        t.sfx('explosion'),
                     ], [
-                        # Le bouclier absorbe le missile et disparaît
-                        t.if_(t.touching(shield), [t.set(shield, 0)]),
+                        t.if_else(t.touching(shield), [
+                            # Le bouclier absorbe le missile et disparaît
+                            t.set(shield, 0),
+                            t.sfx('explosion'),
+                        ], [
+                            # Missile perdu (sauf si la partie vient de finir)
+                            t.if_(t.not_(fin()), [t.sfx('flop')]),
+                        ]),
                     ]),
                     t.hide(),
                 ]),
@@ -522,6 +560,7 @@ def give(player):
         c.if_(c.eq(c.v('type'), 3), [c.set(f'Bouclier {player}', 1)]),
         # 4 grosse balle : taille doublée jusqu'à la fin du point
         c.if_(c.eq(c.v('type'), 4), [c.set('Taille balle', 200)]),
+        c.sfx('bonus'),
         c.set('fini', 1),
     ]
 
@@ -571,15 +610,43 @@ m.script(m.on_msg('pause'), [m.costume('pause'), m.front(), m.show()])
 m.script(m.on_msg('fin'), [
     m.if_else(m.gt(m.v('Score J1'), 10), [m.costume('j1')], [m.costume('j2')]),
     m.front(), m.show(),
+    m.sfx('fin'),
 ])
 
 
+# --- Bouton son (touche M ou clic sur l'icône) ---------------------------
+speaker = Target('Son')
+k = speaker
+
+
+def toggle_sound():
+    return [
+        k.set('Son', k.sub_(1, k.v('Son'))),
+        k.if_(k.eq(k.v('Son'), 0), [k.stop_sounds()]),
+        k.costume_num(k.sub_(2, k.v('Son'))),   # costume 1 = son actif, 2 = coupé
+    ]
+
+
+k.script(k.on_flag(), [k.goto(222, -22), k.costume_num(k.sub_(2, k.v('Son'))), k.show()])
+k.script(k.on_key('m'), toggle_sound())
+k.script(k.on_click(), toggle_sound())
+
+
 # --- Assemblage ----------------------------------------------------------
-def sprite_json(t, costumes, layer, x=0, y=0, visible=True, costume_index=0):
+def sound(name):
+    data, count = sons.SOUNDS[name]()
+    md5 = hashlib.md5(data).hexdigest()
+    assets[md5 + '.wav'] = data
+    return {'name': name, 'assetId': md5, 'dataFormat': 'wav', 'format': '',
+            'rate': sons.RATE, 'sampleCount': count, 'md5ext': md5 + '.wav'}
+
+
+def sprite_json(t, costumes, layer, x=0, y=0, visible=True, costume_index=0, sounds=()):
     return {'isStage': False, 'name': t.name,
             'variables': {id: [n, 0] for n, id in t.vars.items()},
             'lists': {}, 'broadcasts': {}, 'blocks': t.blocks, 'comments': {},
-            'currentCostume': costume_index, 'costumes': costumes, 'sounds': [], 'volume': 100,
+            'currentCostume': costume_index, 'costumes': costumes,
+            'sounds': [sound(n) for n in sounds], 'volume': 100,
             'layerOrder': layer, 'visible': visible, 'x': x, 'y': y, 'size': 100,
             'direction': 90, 'draggable': False, 'rotationStyle': 'don\'t rotate'}
 
@@ -587,7 +654,7 @@ def sprite_json(t, costumes, layer, x=0, y=0, visible=True, costume_index=0):
 stage_json = {
     'isStage': True, 'name': 'Stage',
     'variables': {id: [n, {'état': 'titre', 'Taille J1': 100, 'Taille J2': 100,
-                           'Taille balle': 100}.get(n, 0)]
+                           'Taille balle': 100, 'Son': 1}.get(n, 0)]
                   for n, id in GLOBAL_VARS.items()},
     'lists': {}, 'broadcasts': {id: n for n, id in BROADCASTS.items()},
     'blocks': stage.blocks, 'comments': {}, 'currentCostume': 0,
@@ -614,17 +681,22 @@ project = {
         stage_json,
         sprite_json(paddle1, paddle_costumes(PINK), 1, 0, 150, costume_index=2),
         sprite_json(paddle2, paddle_costumes(CYAN), 2, 0, -150, costume_index=2),
-        sprite_json(missile1, [costume('missile', missile_svg(PINK, down=True), 5, 12)], 3, visible=False),
-        sprite_json(missile2, [costume('missile', missile_svg(CYAN, down=False), 5, 12)], 4, visible=False),
+        sprite_json(missile1, [costume('missile', missile_svg(PINK, down=True), 5, 12)], 3, visible=False,
+                    sounds=['missile', 'explosion', 'flop']),
+        sprite_json(missile2, [costume('missile', missile_svg(CYAN, down=False), 5, 12)], 4, visible=False,
+                    sounds=['missile', 'explosion', 'flop']),
         sprite_json(shield1, [costume('bouclier', SHIELD, 236, 5)], 5, 0, 166, visible=False),
         sprite_json(shield2, [costume('bouclier', SHIELD, 236, 5)], 6, 0, -166, visible=False),
         sprite_json(gift, [costume('attaque', gift_svg(RED), 13, 13),
                            costume('défense', gift_svg(GREEN), 13, 13),
                            costume('bouclier', gift_svg(BLUE), 13, 13),
-                           costume('grosse balle', gift_svg(VIOLET), 13, 13)], 7, visible=False),
-        sprite_json(ball, [costume('balle', BALL, 8, 8)], 8, visible=False),
-        sprite_json(msg, [costume(n, svg, 180, 136 if n == 'titre' else 95)
-                          for n, svg in MSG_COSTUMES.items()], 9),
+                           costume('grosse balle', gift_svg(VIOLET), 13, 13)], 7, visible=False,
+                    sounds=['bonus']),
+        sprite_json(ball, [costume('balle', BALL, 8, 8)], 8, visible=False, sounds=['pong']),
+        sprite_json(speaker, [costume('son actif', speaker_svg(True), 13, 11),
+                              costume('son coupé', speaker_svg(False), 13, 11)], 9, 222, -22),
+        sprite_json(msg, [costume(n, svg, 180, 146 if n == 'titre' else 95)
+                          for n, svg in MSG_COSTUMES.items()], 10, sounds=['fin']),
     ],
     'monitors': [
         monitor('Score J1', 8, 140, 'large'),
