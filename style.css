@@ -1,0 +1,100 @@
+:root {
+  --bg: #05010f;
+  --p1: #ff2bd6;
+  --p2: #19f0ff;
+  --text: #e8e6ff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: radial-gradient(ellipse at center, #140630 0%, var(--bg) 70%);
+  color: var(--text);
+  font-family: "Courier New", Consolas, monospace;
+  overflow: hidden;
+}
+
+#stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game {
+  display: block;
+  border-radius: 12px;
+  box-shadow: 0 0 25px rgba(25, 240, 255, .25), 0 0 60px rgba(255, 43, 214, .15);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  text-align: center;
+  background: rgba(5, 1, 15, .72);
+  backdrop-filter: blur(3px);
+  padding: 1rem;
+}
+
+.overlay.hidden { display: none; }
+
+.overlay h1 {
+  font-size: clamp(3rem, 12vw, 7rem);
+  letter-spacing: .3em;
+  margin-right: -.3em;
+  color: #fff;
+  text-shadow: 0 0 10px var(--p2), 0 0 30px var(--p2), 0 0 60px var(--p1);
+}
+
+#overlay-msg {
+  font-size: clamp(1.1rem, 3.5vw, 1.8rem);
+  text-shadow: 0 0 8px currentColor;
+}
+
+#overlay-stats {
+  font-size: clamp(.95rem, 2.8vw, 1.2rem);
+  opacity: .8;
+}
+#overlay-stats:empty { display: none; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .9rem 1.2rem;
+  border: 2px solid currentColor;
+  border-radius: 10px;
+  box-shadow: 0 0 12px currentColor inset, 0 0 12px currentColor;
+}
+.player.p1 { color: var(--p1); }
+.player.p2 { color: var(--p2); }
+.player .label { font-weight: bold; text-transform: uppercase; letter-spacing: .1em; }
+.player span:not(.label) { color: var(--text); }
+
+kbd {
+  display: inline-block;
+  min-width: 1.8em;
+  padding: .15em .45em;
+  border: 1px solid var(--text);
+  border-radius: 4px;
+  font-family: inherit;
+  font-weight: bold;
+  background: rgba(255, 255, 255, .08);
+}
+
+.hint { opacity: .85; }

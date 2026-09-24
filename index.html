@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pong Néon</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage">
+    <canvas id="game"></canvas>
+
+    <div id="overlay" class="overlay">
+      <h1>PONG</h1>
+      <p id="overlay-msg">Premier à 11 points</p>
+      <p id="overlay-stats"></p>
+      <div class="controls">
+        <div class="player p1">
+          <span class="label">Joueur 1 · haut</span>
+          <span><kbd>Q</kbd> gauche &nbsp; <kbd>D</kbd> droite</span>
+        </div>
+        <div class="player p2">
+          <span class="label">Joueur 2 · bas</span>
+          <span><kbd>4</kbd> gauche &nbsp; <kbd>6</kbd> droite <small>(pavé num.)</small></span>
+        </div>
+      </div>
+      <p class="hint"><kbd>Entrée</kbd> pour jouer · <kbd>Espace</kbd>/<kbd>Échap</kbd> pause</p>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
