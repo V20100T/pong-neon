@@ -148,7 +148,7 @@
 
   function resize() {
     const scale = Math.min(window.innerWidth * 0.96 / W, window.innerHeight * 0.96 / H);
-    const cssW = Math.floor(W * scale), cssH = Math.floor(H * scale);
+    const cssW = Math.max(1, Math.floor(W * scale)), cssH = Math.max(1, Math.floor(H * scale));
     const dpr = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_HEIGHT / cssH);
     canvas.style.width = cssW + 'px';
     canvas.style.height = cssH + 'px';
@@ -166,8 +166,8 @@
     let img = sprites.get(key);
     if (!img) {
       img = document.createElement('canvas');
-      img.width = Math.ceil(w * S);
-      img.height = Math.ceil(h * S);
+      img.width = Math.max(1, Math.ceil(w * S));
+      img.height = Math.max(1, Math.ceil(h * S));
       const c = img.getContext('2d');
       c.scale(S, S);
       draw(c);
@@ -673,11 +673,11 @@
 
   // --- Boucle principale ------------------------------------------------
   function loop(now) {
+    requestAnimationFrame(loop); // programmé d'abord : une erreur ponctuelle n'arrête pas le jeu
     const dt = Math.min((now - lastTime) / 1000, 0.05); // plafonné si l'onglet a été inactif
     lastTime = now;
     update(dt);
-    draw();
-    requestAnimationFrame(loop);
+    if (canvas.width > 0 && canvas.height > 0) draw(); // fenêtre réduite à zéro : rien à dessiner
   }
 
   // Accès pour les tests automatisés (uniquement avec ?debug dans l'adresse)
