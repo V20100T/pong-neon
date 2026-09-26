@@ -30,6 +30,23 @@ html, body {
   box-shadow: 0 0 25px rgba(25, 240, 255, .25), 0 0 60px rgba(255, 43, 214, .15);
 }
 
+#mute {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  line-height: 1;
+  border: 1px solid rgba(232, 230, 255, .35);
+  border-radius: 50%;
+  background: rgba(5, 1, 15, .6);
+  color: var(--text);
+  cursor: pointer;
+  z-index: 2;
+}
+#mute:hover { border-color: var(--text); }
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -37,17 +54,17 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.5rem;
+  gap: 1.1rem;
   text-align: center;
-  background: rgba(5, 1, 15, .72);
-  backdrop-filter: blur(3px);
+  background: rgba(5, 1, 15, .8);
   padding: 1rem;
+  overflow-y: auto;
 }
 
 .overlay.hidden { display: none; }
 
 .overlay h1 {
-  font-size: clamp(3rem, 12vw, 7rem);
+  font-size: clamp(2.6rem, 10vw, 6rem);
   letter-spacing: .3em;
   margin-right: -.3em;
   color: #fff;
@@ -76,7 +93,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: .5rem;
-  padding: .9rem 1.2rem;
+  padding: .8rem 1.1rem;
   border: 2px solid currentColor;
   border-radius: 10px;
   box-shadow: 0 0 12px currentColor inset, 0 0 12px currentColor;
@@ -85,6 +102,32 @@ html, body {
 .player.p2 { color: var(--p2); }
 .player .label { font-weight: bold; text-transform: uppercase; letter-spacing: .1em; }
 .player span:not(.label) { color: var(--text); }
+
+.legend {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: .45rem 1.4rem;
+  max-width: 34rem;
+  width: 100%;
+  text-align: left;
+  font-size: .95rem;
+}
+.legend li { display: flex; align-items: center; gap: .6rem; }
+.legend i {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 6px;
+  background: var(--c);
+  color: #05010f;
+  font-style: normal;
+  font-weight: bold;
+  font-size: .9rem;
+  box-shadow: 0 0 8px var(--c);
+}
 
 kbd {
   display: inline-block;

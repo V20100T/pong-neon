@@ -9,6 +9,7 @@
 <body>
   <main id="stage">
     <canvas id="game"></canvas>
+    <button id="mute" type="button" title="Couper / remettre le son (M)" aria-label="Couper le son">🔊</button>
 
     <div id="overlay" class="overlay">
       <h1>PONG</h1>
@@ -17,14 +18,23 @@
       <div class="controls">
         <div class="player p1">
           <span class="label">Joueur 1 · haut</span>
-          <span><kbd>Q</kbd> gauche &nbsp; <kbd>D</kbd> droite</span>
+          <span><kbd>Q</kbd> gauche &nbsp; <kbd>D</kbd> droite &nbsp; <kbd>S</kbd> tir</span>
         </div>
         <div class="player p2">
           <span class="label">Joueur 2 · bas</span>
-          <span><kbd>4</kbd> gauche &nbsp; <kbd>6</kbd> droite <small>(pavé num.)</small></span>
+          <span><kbd>4</kbd> gauche &nbsp; <kbd>6</kbd> droite &nbsp; <kbd>8</kbd> tir <small>(pavé num.)</small></span>
         </div>
       </div>
-      <p class="hint"><kbd>Entrée</kbd> pour jouer · <kbd>Espace</kbd>/<kbd>Échap</kbd> pause</p>
+      <ul class="legend">
+        <li><i style="--c:#ff4b4b">🚀</i> Missile (jusqu'à 3, tirés ensemble)</li>
+        <li><i style="--c:#2bff88">⟷</i> Raquette plus longue</li>
+        <li><i style="--c:#3b8bff">🛡</i> Bouclier derrière la raquette</li>
+        <li><i style="--c:#b04bff">●</i> Grosse balle (jusqu'au point)</li>
+        <li><i style="--c:#ffd23b">⚡</i> Balles plus rapides (6 s)</li>
+        <li><i style="--c:#ff9a3b">🐢</i> Balles plus lentes (6 s)</li>
+        <li><i style="--c:#e8e6ff">×2</i> Multi-balle (×2 ou ×3)</li>
+      </ul>
+      <p class="hint"><kbd>Entrée</kbd> jouer · <kbd>Espace</kbd>/<kbd>Échap</kbd> pause · <kbd>M</kbd> son</p>
     </div>
   </main>
 
