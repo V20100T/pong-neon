@@ -27,6 +27,8 @@ jobs:
         run: |
           mkdir _site
           cp index.html style.css game.js _site/
+          # Numéro de version dans les liens : les navigateurs rechargent le jeu après chaque mise à jour
+          sed -i "s/\(game\.js\|style\.css\)\"/\1?v=${GITHUB_SHA::7}\"/g" _site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
